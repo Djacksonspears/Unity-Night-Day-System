@@ -1,4 +1,4 @@
-Shader "Skybox/NightDay"
+Shader "Skybox/NightDay 2D"
 {
     Properties
     {

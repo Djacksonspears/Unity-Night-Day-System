@@ -1,5 +1,4 @@
 using System;
-using Sirenix.OdinInspector;
 using UnityEngine;
 using TMPro;
 using UnityEngine.Rendering;
@@ -24,7 +23,7 @@ public class TimeManager : MonoBehaviour {
     
     ColorAdjustments colorAdjustments;
     
-    [InlineEditor, SerializeField] TimeSettings timeSettings;
+    [SerializeField] TimeSettings timeSettings;
     
     public event Action OnSunrise {
         add => service.OnSunrise += value;
