@@ -1,8 +1,8 @@
-using System;
 using UnityEngine;
 using TMPro;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using Scepter;
 
 public class TimeManager : MonoBehaviour {
     [SerializeField] TextMeshProUGUI timeText;
@@ -18,38 +18,19 @@ public class TimeManager : MonoBehaviour {
     [SerializeField] Volume volume;
     [SerializeField] Material skyboxMaterial;
     
-    [SerializeField] RectTransform dial;
-    float initialDialRotation;
-    
-    ColorAdjustments colorAdjustments;
-    
     [SerializeField] TimeSettings timeSettings;
     
-    public event Action OnSunrise {
-        add => service.OnSunrise += value;
-        remove => service.OnSunrise -= value;
-    }
-    
-    public event Action OnSunset {
-        add => service.OnSunset += value;
-        remove => service.OnSunset -= value;
-    }
-    
-    public event Action OnHourChange {
-        add => service.OnHourChange += value;
-        remove => service.OnHourChange -= value;
-    }    
-
+    ColorAdjustments colorAdjustments;
     TimeService service;
 
     void Start() {
         service = new TimeService(timeSettings);
         volume.profile.TryGet(out colorAdjustments);
-        OnSunrise += () => Debug.Log("Sunrise");
-        OnSunset += () => Debug.Log("Sunset");
-        OnHourChange += () => Debug.Log("Hour change");
         
-        initialDialRotation = dial.rotation.eulerAngles.z;
+        // Scepter handles the internal subscriptions and scene-load cleanup
+        MessageWorld.Receive<SunriseMsg>(_ => Debug.Log("Sunrise"));
+        MessageWorld.Receive<SunsetMsg>(_ => Debug.Log("Sunset"));
+        MessageWorld.Receive<HourChangedMsg>(msg => Debug.Log($"Hour changed to: {msg.NewHour}"));
     }
 
     void Update() {
@@ -58,6 +39,7 @@ public class TimeManager : MonoBehaviour {
         UpdateLightSettings();
         UpdateSkyBlend();
         
+        // Debug Controls for Time Multiplier
         if (Input.GetKeyDown(KeyCode.Space)) {
             timeSettings.timeMultiplier *= 2;
         }
@@ -85,8 +67,8 @@ public class TimeManager : MonoBehaviour {
 
     void RotateSun() {
         float rotation = service.CalculateSunAngle();
+        // Only rotates the Sun light object now; dial logic removed.
         sun.transform.rotation = Quaternion.AngleAxis(rotation, Vector3.right);
-        dial.rotation = Quaternion.Euler(0, 0, rotation + initialDialRotation);
     }
 
     void UpdateTimeOfDay() {

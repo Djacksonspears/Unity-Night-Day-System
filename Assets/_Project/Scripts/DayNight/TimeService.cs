@@ -1,5 +1,5 @@
 using System;
-using UnityEngine;
+using Scepter;
 
 public class TimeService {
     readonly TimeSettings settings;
@@ -8,13 +8,9 @@ public class TimeService {
     readonly TimeSpan sunsetTime;
 
     public DateTime CurrentTime => currentTime;
-
-    public event Action OnSunrise = delegate { };
-    public event Action OnSunset = delegate { };
-    public event Action OnHourChange = delegate { };
-
-    readonly Observable<bool> isDayTime;
-    readonly Observable<int> currentHour;
+    
+    bool wasDayTime;
+    int lastHour;
 
     public TimeService(TimeSettings settings) {
         this.settings = settings;
@@ -22,17 +18,25 @@ public class TimeService {
         sunriseTime = TimeSpan.FromHours(settings.sunriseHour);
         sunsetTime = TimeSpan.FromHours(settings.sunsetHour);
         
-        isDayTime = new Observable<bool>(IsDayTime());
-        currentHour = new Observable<int>(currentTime.Hour);
-        
-        isDayTime.ValueChanged += day => (day ? OnSunrise : OnSunset)?.Invoke();
-        currentHour.ValueChanged += _ => OnHourChange?.Invoke();
+        wasDayTime = IsDayTime();
+        lastHour = currentTime.Hour;
     }
 
     public void UpdateTime(float deltaTime) {
         currentTime = currentTime.AddSeconds(deltaTime * settings.timeMultiplier);
-        isDayTime.Value = IsDayTime();
-        currentHour.Value = currentTime.Hour;
+        
+        // State change detection
+        bool isDay = IsDayTime();
+        if (isDay != wasDayTime) {
+            if (isDay) new SunriseMsg().Send();
+            else new SunsetMsg().Send();
+            wasDayTime = isDay;
+        }
+
+        if (currentTime.Hour != lastHour) {
+            lastHour = currentTime.Hour;
+            new HourChangedMsg { NewHour = lastHour }.Send();
+        }
     }
     
     public float CalculateSunAngle() {
@@ -45,18 +49,11 @@ public class TimeService {
         TimeSpan elapsedTime = CalculateDifference(start, currentTime.TimeOfDay);
 
         double percentage = elapsedTime.TotalMinutes / totalTime.TotalMinutes;
-        return Mathf.Lerp(startDegree, startDegree + 180, (float) percentage);
+        return UnityEngine.Mathf.Lerp(startDegree, startDegree + 180, (float)percentage);
     }
 
-    // This method checks whether the current game time falls within the daytime period.
-    // It returns true if the current time of day is later than sunriseTime and earlier than sunsetTime,
-    // representing daytime. Otherwise, it returns false, indicating it is nighttime.
     bool IsDayTime() => currentTime.TimeOfDay > sunriseTime && currentTime.TimeOfDay < sunsetTime;
-    
-    // This method calculates the difference between two TimeSpan objects ("from" and "to").
-    // If the calculated difference is negative, this indicates that the "from" time is ahead of the "to" time.
-    // In such cases, 24 hours (representing a full day) is added to the negative difference to calculate the actual
-    // time difference taking into account the next day.    
+
     TimeSpan CalculateDifference(TimeSpan from, TimeSpan to) {
         TimeSpan difference = to - from;
         return difference.TotalHours < 0 ? difference + TimeSpan.FromHours(24) : difference;
