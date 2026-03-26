@@ -60,6 +60,10 @@ public class TimeManager : MonoBehaviour {
         
         sun.intensity = Mathf.Lerp(0, maxSunIntensity, lightIntensity);
         moon.intensity = Mathf.Lerp(maxMoonIntensity, 0, lightIntensity);
+
+        // Add these — mirrors the intensity lerp exactly
+        sun.shadowStrength  = Mathf.Lerp(0, 1f, lightIntensity);
+        moon.shadowStrength = Mathf.Lerp(0.5f, 0f, lightIntensity);
         
         if (colorAdjustments == null) return;
         colorAdjustments.colorFilter.value = Color.Lerp(nightAmbientLight, dayAmbientLight, lightIntensity);
