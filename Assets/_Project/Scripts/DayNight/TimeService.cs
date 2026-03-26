@@ -54,6 +54,8 @@ public class TimeService {
 
     bool IsDayTime() => currentTime.TimeOfDay > sunriseTime && currentTime.TimeOfDay < sunsetTime;
 
+    public void SetTime(float hour) { currentTime = currentTime.Date + TimeSpan.FromHours(hour);}
+
     TimeSpan CalculateDifference(TimeSpan from, TimeSpan to) {
         TimeSpan difference = to - from;
         return difference.TotalHours < 0 ? difference + TimeSpan.FromHours(24) : difference;

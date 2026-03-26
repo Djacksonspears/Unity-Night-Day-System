@@ -5,29 +5,32 @@ using UnityEngine.Rendering.Universal;
 using Scepter;
 
 public class TimeManager : MonoBehaviour {
+
+    [Header("UI")]
     [SerializeField] TextMeshProUGUI timeText;
-    
+
+    [Header("Lights")]
     [SerializeField] Light sun;
     [SerializeField] Light moon;
-    [SerializeField] AnimationCurve lightIntensityCurve;
-    [SerializeField] float maxSunIntensity = 1;
-    [SerializeField] float maxMoonIntensity = 0.5f;
-    
-    [SerializeField] Color dayAmbientLight;
-    [SerializeField] Color nightAmbientLight;
+
+    [Header("Scene")]
     [SerializeField] Volume volume;
     [SerializeField] Material skyboxMaterial;
-    
+
+    [Header("Settings")]
     [SerializeField] TimeSettings timeSettings;
     
+    //this is for testing keys
+    const float MINUTES_BEFORE = 2f;
+
+
     ColorAdjustments colorAdjustments;
     TimeService service;
 
     void Start() {
         service = new TimeService(timeSettings);
         volume.profile.TryGet(out colorAdjustments);
-        
-        // Scepter handles the internal subscriptions and scene-load cleanup
+
         MessageWorld.Receive<SunriseMsg>(_ => Debug.Log("Sunrise"));
         MessageWorld.Receive<SunsetMsg>(_ => Debug.Log("Sunset"));
         MessageWorld.Receive<HourChangedMsg>(msg => Debug.Log($"Hour changed to: {msg.NewHour}"));
@@ -38,47 +41,49 @@ public class TimeManager : MonoBehaviour {
         RotateSun();
         UpdateLightSettings();
         UpdateSkyBlend();
-        
-        // Debug Controls for Time Multiplier
-        if (Input.GetKeyDown(KeyCode.Space)) {
-            timeSettings.timeMultiplier *= 2;
-        }
-        if (Input.GetKeyDown(KeyCode.LeftShift)) {
-            timeSettings.timeMultiplier /= 2;
-        }
+
+        if (Input.GetKeyDown(KeyCode.Space))     timeSettings.timeMultiplier *= 2;
+        if (Input.GetKeyDown(KeyCode.LeftShift)) timeSettings.timeMultiplier /= 2;
+
+        // Jump to just before sunset (dusk)
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+            service.SetTime(timeSettings.sunsetHour - (MINUTES_BEFORE / 60f));
+
+        // Jump to just before sunrise (dawn)
+        if (Input.GetKeyDown(KeyCode.Alpha2))
+            service.SetTime(timeSettings.sunriseHour - (MINUTES_BEFORE / 60f));
     }
 
     void UpdateSkyBlend() {
-        float dotProduct = Vector3.Dot(sun.transform.forward, Vector3.up);
-        float blend = Mathf.Lerp(0, 1, lightIntensityCurve.Evaluate(dotProduct));
+        float dot   = Vector3.Dot(sun.transform.forward, Vector3.up);
+        float blend = Mathf.Lerp(0, 1, timeSettings.lightIntensityCurve.Evaluate(dot));
         skyboxMaterial.SetFloat("_Blend", blend);
     }
-    
-    void UpdateLightSettings() {
-        float dotProduct = Vector3.Dot(sun.transform.forward, Vector3.down);
-        float lightIntensity = lightIntensityCurve.Evaluate(dotProduct);
-        
-        sun.intensity = Mathf.Lerp(0, maxSunIntensity, lightIntensity);
-        moon.intensity = Mathf.Lerp(maxMoonIntensity, 0, lightIntensity);
 
-        // Add these — mirrors the intensity lerp exactly
-        sun.shadowStrength  = Mathf.Lerp(0, 1f, lightIntensity);
-        moon.shadowStrength = Mathf.Lerp(0.5f, 0f, lightIntensity);
-        
+    void UpdateLightSettings() {
+        float dot           = Vector3.Dot(sun.transform.forward, Vector3.down);
+        float lightIntensity = timeSettings.lightIntensityCurve.Evaluate(dot);
+
+        sun.intensity        = Mathf.Lerp(0,                           timeSettings.maxSunIntensity,  lightIntensity);
+        sun.shadowStrength   = Mathf.Lerp(0,                           timeSettings.maxSunShadow,     lightIntensity);
+        moon.intensity       = Mathf.Lerp(timeSettings.maxMoonIntensity, 0,                           lightIntensity);
+        moon.shadowStrength  = Mathf.Lerp(timeSettings.maxMoonShadow,    0,                           lightIntensity);
+
         if (colorAdjustments == null) return;
-        colorAdjustments.colorFilter.value = Color.Lerp(nightAmbientLight, dayAmbientLight, lightIntensity);
+        colorAdjustments.colorFilter.value = Color.Lerp(
+            timeSettings.nightAmbientLight,
+            timeSettings.dayAmbientLight,
+            lightIntensity
+        );
     }
 
     void RotateSun() {
-        float rotation = service.CalculateSunAngle();
-        // Only rotates the Sun light object now; dial logic removed.
-        sun.transform.rotation = Quaternion.AngleAxis(rotation, Vector3.right);
+        sun.transform.rotation = Quaternion.AngleAxis(service.CalculateSunAngle(), Vector3.right);
     }
 
     void UpdateTimeOfDay() {
         service.UpdateTime(Time.deltaTime);
-        if (timeText != null) {
+        if (timeText != null)
             timeText.text = service.CurrentTime.ToString("hh:mm");
-        }
     }
 }
